@@ -17,7 +17,7 @@ public class TestCassandraBuilder {
 			tableManager.updateIntoTable();
 			tableManager.selectFromTable();
 			tableManager.deleteFromTable();
-			tableManager.dropTable();
+			//tableManager.dropTable();
 		}
 	}
 }
