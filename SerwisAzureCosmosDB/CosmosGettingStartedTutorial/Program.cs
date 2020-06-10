@@ -4,31 +4,24 @@ using System.Configuration;
 using System.Collections.Generic;
 using System.Net;
 using Microsoft.Azure.Cosmos;
+using System.Collections;
 
 namespace CosmosGettingStartedTutorial
 {
     class Program
     {
-        // The Azure Cosmos DB endpoint for running this sample.
         private static readonly string EndpointUri = ConfigurationManager.AppSettings["EndPointUri"];
-
-        // The primary key for the Azure Cosmos account.
         private static readonly string PrimaryKey = ConfigurationManager.AppSettings["PrimaryKey"];
 
-        // The Cosmos client instance
         private CosmosClient cosmosClient;
-
-        // The database we will create
         private Database database;
-
-        // The container we will create.
         private Container container;
 
-        // The name of the database and container we will create
-        private string databaseId = "ToDoList";
-        private string containerId = "Items";
+        private string databaseId = "Serwis";
+        private string containerId = "ToDoList";
 
-        // <Main>
+        private bool koniec = false;
+
         public static async Task Main(string[] args)
         {
             try
@@ -36,6 +29,7 @@ namespace CosmosGettingStartedTutorial
                 Console.WriteLine("Beginning operations...\n");
                 Program p = new Program();
                 await p.GetStartedDemoAsync();
+                
 
             }
             catch (CosmosException de)
@@ -53,62 +47,158 @@ namespace CosmosGettingStartedTutorial
                 Console.ReadKey();
             }
         }
-        // </Main>
 
-        // <GetStartedDemoAsync>
-        /// <summary>
-        /// Entry point to call methods that operate on Azure Cosmos DB resources in this sample
-        /// </summary>
+        public async Task Menu()
+        {
+            while (!koniec)
+            {
+                await showMenu();
+                await getWyborMenu();
+            }
+        }
+
+        public async Task showMenu()
+        {
+            Console.WriteLine("\n**************  MENU:  ***************");
+            Console.WriteLine("1 - Dodaj  ");
+            Console.WriteLine("2 - Wyświetl  po  id ");
+            Console.WriteLine("3 - Zaktualizuj ");
+            Console.WriteLine("4 - Usuń po id");
+            Console.WriteLine("0 - WYJŚCIE\n");
+        }
+
+        public async Task getWyborMenu()
+        {
+            int choice = -1;
+            do
+            {
+                Console.WriteLine("Podaj wybór:");
+                choice = Convert.ToInt32(Console.ReadLine());
+                if (choice < 0 || choice > 4)
+                {
+                    Console.WriteLine("Brak takiej opcji!!!");
+                }
+            } while (choice < 0 || choice > 4);
+            await akcja(choice);
+        }
+
+        public async Task akcja(int choice)
+        {
+            switch (choice)
+            {
+                case 1:
+                    await addNew();
+                    break;
+                case 2:
+                    await findById();
+                    break;
+                case 3:
+                    //await update();
+                    break;
+                case 4:
+                    //await delete();
+                    break;
+                case 0:
+                    koniec = true;
+                    break;
+            }
+        }
+
+        private async Task addNew()
+        {
+            Naprawa naprawa = new Naprawa();
+            Console.WriteLine("Podaj id:");
+            naprawa.id = Convert.ToInt32(Console.ReadLine());
+            Console.WriteLine("Podaj imie właściciela:");
+            naprawa.imie = Console.ReadLine();
+            Console.WriteLine("Podaj nazwisko właściciela:");
+            naprawa.nazwisko = Console.ReadLine();
+            Console.WriteLine("Podaj date serwisu:");
+            naprawa.data = Console.ReadLine();
+            Console.WriteLine("Podaj dane samochodu:");
+            Samochod samochod = new Samochod();
+            Console.WriteLine("Podaj marke samochodu:");
+            samochod.marka = Console.ReadLine();
+            Console.WriteLine("Podaj model samochodu:");
+            samochod.model = Console.ReadLine();
+            Console.WriteLine("Podaj rok produkcji samochodu:");
+            samochod.rok = Convert.ToInt32(Console.ReadLine());
+            Console.WriteLine("Podaj moc samochodu:");
+            samochod.moc = Convert.ToInt32(Console.ReadLine());
+            Console.WriteLine("Podaj numer rejestracyjny samochodu:");
+            samochod.rej = Console.ReadLine();
+            naprawa.samo = samochod;
+            Console.WriteLine("Podaj liste usterek:");
+
+            naprawa.usterki = new List<string>();
+            bool koniecUst = false;
+            while (!koniecUst)
+            {
+                String text = Console.ReadLine();
+                if (text.Equals("0") == false)
+                {
+                    naprawa.usterki.Add(text);
+                }
+                else
+                {
+                    koniecUst = true;
+                }
+            }
+
+            ItemResponse<Naprawa> response = await this.container.CreateItemAsync<Naprawa>(naprawa, new PartitionKey(naprawa.id));
+        }
+
+        private async Task findById()
+        {
+            Console.WriteLine("Podaj id:");
+            string id = Console.ReadLine();
+
+            var sqlQueryText = $"SELECT * FROM c WHERE c.Id = {id}";
+
+            Console.WriteLine("Running query: {0}\n", sqlQueryText);
+
+            QueryDefinition queryDefinition = new QueryDefinition(sqlQueryText);
+            FeedIterator<Naprawa> queryResultSetIterator = this.container.GetItemQueryIterator<Naprawa>(queryDefinition);
+
+            List<Naprawa> families = new List<Naprawa>();
+
+            while (queryResultSetIterator.HasMoreResults)
+            {
+                FeedResponse<Naprawa> currentResultSet = await queryResultSetIterator.ReadNextAsync();
+                foreach (Naprawa family in currentResultSet)
+                {
+                    families.Add(family);
+                    Console.WriteLine("\tRead {0}\n", family);
+                }
+            }
+        }
+
+
         public async Task GetStartedDemoAsync()
         {
-            // Create a new instance of the Cosmos Client
             this.cosmosClient = new CosmosClient(EndpointUri, PrimaryKey, new CosmosClientOptions() { ApplicationName = "CosmosDBDotnetQuickstart" });
             await this.CreateDatabaseAsync();
             await this.CreateContainerAsync();
             await this.ScaleContainerAsync();
-            await this.AddItemsToContainerAsync();
-            await this.QueryItemsAsync();
-            await this.ReplaceFamilyItemAsync();
-            await this.DeleteFamilyItemAsync();
-            await this.DeleteDatabaseAndCleanupAsync();
-        }
-        // </GetStartedDemoAsync>
+            await this.Menu();
 
-        // <CreateDatabaseAsync>
-        /// <summary>
-        /// Create the database if it does not exist
-        /// </summary>
+            //await this.ScaleContainerAsync();
+            /*await this.AddItemsToContainerAsync();
+            await this.QueryItemsAsync();
+            await this.ReplaceFamilyItemAsync();*/
+        }
         private async Task CreateDatabaseAsync()
         {
-            // Create a new database
             this.database = await this.cosmosClient.CreateDatabaseIfNotExistsAsync(databaseId);
             Console.WriteLine("Created Database: {0}\n", this.database.Id);
         }
-        // </CreateDatabaseAsync>
-
-        // <CreateContainerAsync>
-        /// <summary>
-        /// Create the container if it does not exist. 
-        /// Specifiy "/LastName" as the partition key since we're storing family information, to ensure good distribution of requests and storage.
-        /// </summary>
-        /// <returns></returns>
         private async Task CreateContainerAsync()
         {
-            // Create a new container
             this.container = await this.database.CreateContainerIfNotExistsAsync(containerId, "/LastName", 400);
             Console.WriteLine("Created Container: {0}\n", this.container.Id);
         }
-        // </CreateContainerAsync>
-
-        // <ScaleContainerAsync>
-        /// <summary>
-        /// Scale the throughput provisioned on an existing Container.
-        /// You can scale the throughput (RU/s) of your container up and down to meet the needs of the workload. Learn more: https://aka.ms/cosmos-request-units
-        /// </summary>
-        /// <returns></returns>
         private async Task ScaleContainerAsync()
         {
-            // Read the current throughput
             int? throughput = await this.container.ReadThroughputAsync();
             if (throughput.HasValue)
             {
@@ -120,12 +210,6 @@ namespace CosmosGettingStartedTutorial
             }
             
         }
-        // </ScaleContainerAsync>
-
-        // <AddItemsToContainerAsync>
-        /// <summary>
-        /// Add Family items to the container
-        /// </summary>
         private async Task AddItemsToContainerAsync()
         {
             // Create a family object for the Andersen family
@@ -221,13 +305,6 @@ namespace CosmosGettingStartedTutorial
                 Console.WriteLine("Created item in database with id: {0} Operation consumed {1} RUs.\n", wakefieldFamilyResponse.Resource.Id, wakefieldFamilyResponse.RequestCharge);
             }
         }
-        // </AddItemsToContainerAsync>
-
-        // <QueryItemsAsync>
-        /// <summary>
-        /// Run a query (using Azure Cosmos DB SQL syntax) against the container
-        /// Including the partition key value of lastName in the WHERE filter results in a more efficient query
-        /// </summary>
         private async Task QueryItemsAsync()
         {
             var sqlQueryText = "SELECT * FROM c WHERE c.LastName = 'Andersen'";
@@ -249,12 +326,6 @@ namespace CosmosGettingStartedTutorial
                 }
             }
         }
-        // </QueryItemsAsync>
-
-        // <ReplaceFamilyItemAsync>
-        /// <summary>
-        /// Replace an item in the container
-        /// </summary>
         private async Task ReplaceFamilyItemAsync()
         {
             ItemResponse<Family> wakefieldFamilyResponse = await this.container.ReadItemAsync<Family>("Wakefield.7", new PartitionKey("Wakefield"));
@@ -269,12 +340,6 @@ namespace CosmosGettingStartedTutorial
             wakefieldFamilyResponse = await this.container.ReplaceItemAsync<Family>(itemBody, itemBody.Id, new PartitionKey(itemBody.LastName));
             Console.WriteLine("Updated Family [{0},{1}].\n \tBody is now: {2}\n", itemBody.LastName, itemBody.Id, wakefieldFamilyResponse.Resource);
         }
-        // </ReplaceFamilyItemAsync>
-
-        // <DeleteFamilyItemAsync>
-        /// <summary>
-        /// Delete an item in the container
-        /// </summary>
         private async Task DeleteFamilyItemAsync()
         {
             var partitionKeyValue = "Wakefield";
@@ -284,12 +349,6 @@ namespace CosmosGettingStartedTutorial
             ItemResponse<Family> wakefieldFamilyResponse = await this.container.DeleteItemAsync<Family>(familyId,new PartitionKey(partitionKeyValue));
             Console.WriteLine("Deleted Family [{0},{1}]\n", partitionKeyValue, familyId);
         }
-        // </DeleteFamilyItemAsync>
-
-        // <DeleteDatabaseAndCleanupAsync>
-        /// <summary>
-        /// Delete the database and dispose of the Cosmos Client instance
-        /// </summary>
         private async Task DeleteDatabaseAndCleanupAsync()
         {
             DatabaseResponse databaseResourceResponse = await this.database.DeleteAsync();
@@ -300,6 +359,6 @@ namespace CosmosGettingStartedTutorial
             //Dispose of CosmosClient
             this.cosmosClient.Dispose();
         }
-        // </DeleteDatabaseAndCleanupAsync>
+ 
     }
 }
